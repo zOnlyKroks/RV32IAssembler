@@ -1,0 +1,10 @@
+lwi x1, 0xbdcccccd
+lwi x2, 0xc0000000
+lwi x3, 2
+lwi x4, 0x01000000
+
+sw x1, 0(x4)
+sw x2, 4(x4)
+sw x3, 8(x4)
+
+lw x5, 12(x4)
