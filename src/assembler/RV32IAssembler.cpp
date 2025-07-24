@@ -71,7 +71,7 @@
 #include "../isn/expander/impl/fpu/imm/I2FImmExpander.h"
 #include "../isn/expander/impl/fpu/norm/I2FExpander.h"
 
-std::map<std::string, std::unique_ptr<Instruction>> RV32IAssembler::instructions;
+std::map<std::string, std::unique_ptr<Instruction> > RV32IAssembler::instructions;
 std::map<std::string, int> RV32IAssembler::registers;
 
 void RV32IAssembler::init() {
@@ -85,7 +85,7 @@ void RV32IAssembler::init() {
 
 void RV32IAssembler::initializeRegisters() {
     for (int i = 0; i < 32; ++i) {
-        const char* abiNames[] = {
+        const char *abiNames[] = {
             "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
             "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
             "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",
@@ -157,7 +157,7 @@ void RV32IAssembler::initializeInstructions() {
     addInstruction("mulhu", new RTypeEncoder(), 0x33, 3, 0x01);
     addInstruction("div", new RTypeEncoder(), 0x33, 4, 0x01);
     addInstruction("divu", new RTypeEncoder(), 0x33, 5, 0x01);
-    addInstruction("rem", new RTypeEncoder(), 0x33, 6,0x01);
+    addInstruction("rem", new RTypeEncoder(), 0x33, 6, 0x01);
     addInstruction("remu", new RTypeEncoder(), 0x33, 7, 0x01);
 
     addPseudoInstruction("beqz", new BegzExpander());
@@ -220,81 +220,95 @@ void RV32IAssembler::initializeInstructions() {
     addPseudoInstruction("i2f", new I2FExpander());
 }
 
-void RV32IAssembler::addInstruction(const std::string& mnemonic,
-                                   InstructionEncoder* encoder,
-                                   int opCode, int funct3, int funct7) {
+void RV32IAssembler::addInstruction(const std::string &mnemonic,
+                                    InstructionEncoder *encoder,
+                                    int opCode, int funct3, int funct7) {
     instructions[mnemonic] = std::make_unique<RealInstruction>(
         mnemonic, encoder, opCode, funct3, funct7
     );
 }
 
-void RV32IAssembler::addPseudoInstruction(const std::string& mnemonic,
-                                         PseudoInstructionExpander* expander) {
+void RV32IAssembler::addPseudoInstruction(const std::string &mnemonic,
+                                          PseudoInstructionExpander *expander) {
     instructions[mnemonic] = std::make_unique<PseudoInstruction>(
         mnemonic, expander
     );
 }
 
-RealInstruction* RV32IAssembler::getRealInstruction(const std::string& mnemonic) {
+RealInstruction *RV32IAssembler::getRealInstruction(const std::string &mnemonic) {
     const auto it = instructions.find(mnemonic);
-    if (it == instructions.end() || !dynamic_cast<RealInstruction*>(it->second.get())) {
+    if (it == instructions.end() || !dynamic_cast<RealInstruction *>(it->second.get())) {
         throw std::invalid_argument("No real instruction for: " + mnemonic);
     }
-    return dynamic_cast<RealInstruction*>(it->second.get());
+    return dynamic_cast<RealInstruction *>(it->second.get());
 }
 
-PseudoInstruction* RV32IAssembler::getPseudoInstruction(const std::string& mnemonic) {
+PseudoInstruction *RV32IAssembler::getPseudoInstruction(const std::string &mnemonic) {
     const auto it = instructions.find(mnemonic);
-    if (it == instructions.end() || !dynamic_cast<PseudoInstruction*>(it->second.get())) {
+    if (it == instructions.end() || !dynamic_cast<PseudoInstruction *>(it->second.get())) {
         throw std::invalid_argument("No pseudo instruction for: " + mnemonic);
     }
-    return dynamic_cast<PseudoInstruction*>(it->second.get());
+    return dynamic_cast<PseudoInstruction *>(it->second.get());
 }
 
-std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& lines) {
+std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string> &lines) {
     std::map<std::string, uint32_t> labels;
     std::vector<std::string> cleanedLines;
     uint32_t address = 0;
 
-    for (const auto& line : lines) {
+    for (const auto &line: lines) {
         std::string processed = removeComments(line);
-
-        processed.erase(processed.begin(),
-            std::ranges::find_if(processed,
-                                 [](const int ch) { return !std::isspace(ch); }));
-        processed.erase(
-            std::find_if(processed.rbegin(), processed.rend(),
-                [](const int ch) { return !std::isspace(ch); }).base(),
-            processed.end());
+        trimInPlace(processed);
 
         if (processed.empty()) continue;
 
         if (size_t colonPos = processed.find(':'); colonPos != std::string::npos) {
-            if (std::string label = processed.substr(0, colonPos); !label.empty()) {
-                if (labels.contains(label)) {
-                    throw AssemblyException("Duplicate label: " + label);
-                }
-                labels[label] = address;
+            std::string label = processed.substr(0, colonPos);
+            trimInPlace(label);
+            if (label.empty()) {
+                throw AssemblyException("Empty label");
             }
+            if (labels.contains(label)) {
+                throw AssemblyException("Duplicate label: " + label);
+            }
+            labels[label] = address;
+
             processed = processed.substr(colonPos + 1);
+            trimInPlace(processed);
+            if (processed.empty()) continue;
+        } else {
+            if (size_t eqPos = processed.find('='); eqPos != std::string::npos) {
+                std::string varName = processed.substr(0, eqPos);
+                trimInPlace(varName);
+                if (varName.empty()) {
+                    throw AssemblyException("Missing variable name before '='");
+                }
+                if (labels.contains(varName)) {
+                    throw AssemblyException("Duplicate label or variable: " + varName);
+                }
 
-            processed.erase(processed.begin(),
-                std::ranges::find_if(processed,
-                                     [](const int ch) { return !std::isspace(ch); }));
+                std::string expr = processed.substr(eqPos + 1);
+                trimInPlace(expr);
+                try {
+                    uint32_t value = parseConstant(expr);
+                    labels[varName] = value;
+                } catch (const std::exception& e) {
+                    throw AssemblyException("Invalid constant: " + expr + " (" + e.what() + ")");
+                }
+                continue;
+            }
         }
 
-        if (!processed.empty()) {
-            std::vector<std::string> expanded = expandInstruction(processed, address, labels, 0);
-            cleanedLines.insert(cleanedLines.end(), expanded.begin(), expanded.end());
-            address += static_cast<uint32_t>(expanded.size() * 4);
-        }
+        std::vector<std::string> expanded = expandInstruction(processed, address, labels, 0);
+        cleanedLines.insert(cleanedLines.end(), expanded.begin(), expanded.end());
+        address += static_cast<uint32_t>(expanded.size() * 4);
     }
 
     address = 0;
     std::vector<uint8_t> output;
     output.reserve(cleanedLines.size() * 4);
 
-    for (const auto& line : cleanedLines) {
+    for (const auto &line: cleanedLines) {
         std::istringstream iss(line);
         std::string mnemonic;
         iss >> mnemonic;
@@ -302,22 +316,25 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
         std::vector<std::string> operands;
         std::string token;
         while (std::getline(iss >> std::ws, token, ',')) {
-            token.erase(token.begin(),
-                std::ranges::find_if(token,
-                                     [](const int ch) { return !std::isspace(ch); }));
-            token.erase(
-                std::find_if(token.rbegin(), token.rend(),
-                    [](const int ch) { return !std::isspace(ch); }).base(),
-                token.end());
+            trimInPlace(token);
+
+            if (labels.contains(token)) {
+                if (uint32_t value = labels.at(token); value > 0x7FFFFFFF) {
+                    std::ostringstream oss;
+                    oss << "0x" << std::hex << value;
+                    token = oss.str();
+                } else {
+                    token = std::to_string(static_cast<int32_t>(value));
+                }
+            }
             operands.push_back(token);
         }
 
-        RealInstruction* inst = getRealInstruction(mnemonic);
+        RealInstruction *inst = getRealInstruction(mnemonic);
         uint32_t encoded = inst->getEncoder()->encode(
             mnemonic, operands, address, labels
         );
 
-        // Little-endian byte order
         output.push_back(encoded & 0xFF);
         output.push_back((encoded >> 8) & 0xFF);
         output.push_back((encoded >> 16) & 0xFF);
@@ -328,10 +345,10 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
     return output;
 }
 
-std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& line,
-                                                           uint32_t address,
-                                                           const std::map<std::string, uint32_t>& labels,
-                                                           int depth) {
+std::vector<std::string> RV32IAssembler::expandInstruction(const std::string &line,
+                                                           const uint32_t address,
+                                                           const std::map<std::string, uint32_t> &labels,
+                                                           const int depth) {
     if (depth > 10) {
         throw AssemblyException("Exceeded maximum recursion depth");
     }
@@ -344,17 +361,17 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& li
     std::string token;
     while (std::getline(iss >> std::ws, token, ',')) {
         token.erase(token.begin(),
-            std::ranges::find_if(token,
-                                 [](const int ch) { return !std::isspace(ch); }));
+                    std::ranges::find_if(token,
+                                         [](const int ch) { return !std::isspace(ch); }));
         token.erase(
             std::find_if(token.rbegin(), token.rend(),
-                [](const int ch) { return !std::isspace(ch); }).base(),
+                         [](const int ch) { return !std::isspace(ch); }).base(),
             token.end());
         operands.push_back(token);
     }
 
     try {
-        PseudoInstruction* pseudo = getPseudoInstruction(mnemonic);
+        PseudoInstruction *pseudo = getPseudoInstruction(mnemonic);
         std::vector<std::string> expanded;
 
         if (pseudo->getExpander()->needsLabelContext()) {
@@ -365,18 +382,18 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& li
 
         std::vector<std::string> fullyExpanded;
         uint32_t instrAddress = address;
-        for (const auto& instr : expanded) {
+        for (const auto &instr: expanded) {
             std::vector<std::string> recursed = expandInstruction(instr, instrAddress, labels, depth + 1);
             fullyExpanded.insert(fullyExpanded.end(), recursed.begin(), recursed.end());
             instrAddress += static_cast<uint32_t>(recursed.size() * 4);
         }
         return fullyExpanded;
-    } catch (const std::invalid_argument&) {
+    } catch (const std::invalid_argument &) {
         return {line};
     }
 }
 
-std::string RV32IAssembler::removeComments(const std::string& line) {
+std::string RV32IAssembler::removeComments(const std::string &line) {
     const size_t pos = line.find('#');
     return (pos != std::string::npos) ? line.substr(0, pos) : line;
 }
