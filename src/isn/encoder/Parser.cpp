@@ -1,6 +1,7 @@
 #include "Parser.h"
 
 #include <regex>
+#include <limits>
 
 #include "../../assembler/RV32IAssembler.h"
 

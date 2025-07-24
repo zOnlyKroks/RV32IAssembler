@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <stdexcept>
+#include <cstdint>
 
 class InstructionEncoder {
 public:
