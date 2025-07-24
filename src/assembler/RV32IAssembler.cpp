@@ -12,8 +12,42 @@
 #include "../isn/encoder/impl/ShiftITypeEncoder.h"
 #include "../isn/encoder/impl/STypeEncoder.h"
 #include "../isn/encoder/impl/UTypeEncoder.h"
-#include "../isn/expander/impl/BeqzExpander.h"
+
+#include "../isn/expander/impl/BegzExpander.h"
+#include "../isn/expander/impl/BgezExpander.h"
+#include "../isn/expander/impl/BgtExpander.h"
+#include "../isn/expander/impl/BgtuExpander.h"
+#include "../isn/expander/impl/BgtzExpander.h"
+#include "../isn/expander/impl/BleExpander.h"
+#include "../isn/expander/impl/BleuExpander.h"
+#include "../isn/expander/impl/BlezExpander.h"
+#include "../isn/expander/impl/BltzExpander.h"
+#include "../isn/expander/impl/BnezExpander.h"
+#include "../isn/expander/impl/JumpExpander.h"
+#include "../isn/expander/impl/JumpRegisterExpander.h"
+#include "../isn/expander/impl/MovExpander.h"
+#include "../isn/expander/impl/NegateExpander.h"
+#include "../isn/expander/impl/NopExpander.h"
+#include "../isn/expander/impl/NotExpander.h"
+#include "../isn/expander/impl/PopExpander.h"
+#include "../isn/expander/impl/PushExpander.h"
+#include "../isn/expander/impl/RetExpander.h"
+#include "../isn/expander/impl/SeqzExpander.h"
+#include "../isn/expander/impl/SgtzExpander.h"
+#include "../isn/expander/impl/SltzExpander.h"
+#include "../isn/expander/impl/SnezExpander.h"
 #include "../isn/expander/impl/LoadWordImmediateExpander.h"
+
+#include "../isn/expander/impl/fpu/FAddImmExpander.h"
+#include "../isn/expander/impl/fpu/FSubImmExpander.h"
+#include "../isn/expander/impl/fpu/FMultImmExpander.h"
+#include "../isn/expander/impl/fpu/FDivImmExpander.h"
+#include "../isn/expander/impl/fpu/FNegImmExpander.h"
+#include "../isn/expander/impl/fpu/FCompAGreatB.h"
+#include "../isn/expander/impl/fpu/FCompALessB.h"
+#include "../isn/expander/impl/fpu/FCompAEqualB.h"
+#include "../isn/expander/impl/fpu/F2IImmExpander.h"
+#include "../isn/expander/impl/fpu/I2FImmExpander.h"
 
 std::map<std::string, std::unique_ptr<Instruction>> RV32IAssembler::instructions;
 std::map<std::string, int> RV32IAssembler::registers;
@@ -104,8 +138,42 @@ void RV32IAssembler::initializeInstructions() {
     addInstruction("rem", new RTypeEncoder(), 0x33, 6,0x01);
     addInstruction("remu", new RTypeEncoder(), 0x33, 7, 0x01);
 
+    addPseudoInstruction("beqz", new BegzExpander());
+    addPseudoInstruction("bgez", new BgezExpander());
+    addPseudoInstruction("bgt", new BgtExpander());
+    addPseudoInstruction("bgtu", new BgtuExpander());
+    addPseudoInstruction("bgtz", new BgtzExpander());
+    addPseudoInstruction("ble", new BleExpander());
+    addPseudoInstruction("bleu", new BleuExpander());
+    addPseudoInstruction("blez", new BlezExpander());
+    addPseudoInstruction("bltz", new BltzExpander());
+    addPseudoInstruction("bnez", new BnezExpander());
+    addPseudoInstruction("j", new JumpExpander());
+    addPseudoInstruction("jr", new JumpRegisterExpander());
+    addPseudoInstruction("mov", new MovExpander());
+    addPseudoInstruction("neg", new NegateExpander());
+    addPseudoInstruction("nop", new NopExpander());
+    addPseudoInstruction("not", new NotExpander());
+    addPseudoInstruction("pop", new PopExpander());
+    addPseudoInstruction("push", new PushExpander());
+    addPseudoInstruction("ret", new RetExpander());
+    addPseudoInstruction("seqz", new SeqzExpander());
+    addPseudoInstruction("sgtz", new SgtzExpander());
+    addPseudoInstruction("sltz", new SltzExpander());
+    addPseudoInstruction("snez", new SnezExpander());
     addPseudoInstruction("lwi", new LoadWordImmediateExpander());
-    addPseudoInstruction("beqz", new BeqzExpander());
+
+    addPseudoInstruction("faddimm", new FAddImmExpander());
+    addPseudoInstruction("fsubimm", new FSubImmExpander());
+    addPseudoInstruction("fmulimm", new FmulImmExpander());
+    addPseudoInstruction("fdivimm", new FDivImmExpander());
+    addPseudoInstruction("fnegimm", new FNegImmExpander());
+    addPseudoInstruction("fcmpgt", new FCompAGreatBImmExpander());
+    addPseudoInstruction("fcmplt", new FCompALessBImmExpander());
+    addPseudoInstruction("fcmpeq", new FCompAEqualBImmExpander());
+
+    addPseudoInstruction("f2iimm", new F2IImm());
+    addPseudoInstruction("i2fimm", new I2FImm());
 }
 
 void RV32IAssembler::addInstruction(const std::string& mnemonic, 
@@ -233,9 +301,17 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& li
             token.end());
         operands.push_back(token);
     }
-    
+
     try {
-        return getPseudoInstruction(mnemonic)->getExpander()->expand(operands);
+        PseudoInstruction* pseudo = getPseudoInstruction(mnemonic);
+        std::vector<std::string> expanded = pseudo->getExpander()->expand(operands);
+
+        std::vector<std::string> fullyExpanded;
+        for (const auto& instr : expanded) {
+            std::vector<std::string> recursed = expandInstruction(instr);
+            fullyExpanded.insert(fullyExpanded.end(), recursed.begin(), recursed.end());
+        }
+        return fullyExpanded;
     } catch (const std::invalid_argument&) {
         return {line};
     }

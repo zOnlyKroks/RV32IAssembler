@@ -1,0 +1,14 @@
+#pragma once
+
+#include "../PseudoInstructionExpander.h"
+#include "../../../assembler/RV32IAssembler.h"
+
+class JumpExpander : public PseudoInstructionExpander {
+public:
+    std::vector<std::string> expand(const std::vector<std::string>& operands) override {
+        if (operands.size() != 1) {
+            throw AssemblyException("j requires exactly 1 operand: j imm");
+        }
+        return { "jal x0, " + operands[0] };
+    }
+};
