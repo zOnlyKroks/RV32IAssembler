@@ -37,6 +37,8 @@
 #include "../isn/expander/impl/SltzExpander.h"
 #include "../isn/expander/impl/SnezExpander.h"
 #include "../isn/expander/impl/LoadWordImmediateExpander.h"
+#include "../isn/expander/impl/CallExpander.h"
+#include "../isn/expander/impl/TailExpander.h"
 
 #include "../isn/expander/impl/fpu/imm/FAddImmExpander.h"
 #include "../isn/expander/impl/fpu/norm/FAddExpander.h"
@@ -181,6 +183,9 @@ void RV32IAssembler::initializeInstructions() {
     addPseudoInstruction("sltz", new SltzExpander());
     addPseudoInstruction("snez", new SnezExpander());
     addPseudoInstruction("lwi", new LoadWordImmediateExpander());
+
+    addPseudoInstruction("call", new CallExpander());
+    addPseudoInstruction("tail", new TailExpander());
 
     addPseudoInstruction("faddimm", new FAddImmExpander());
     addPseudoInstruction("fadd", new FAddExpander());
