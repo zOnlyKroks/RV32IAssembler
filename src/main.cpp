@@ -25,7 +25,7 @@ void exportLogisimV3_0(const std::vector<uint8_t>& bytes,
                 << addr
                 << ":";
 
-        size_t bytesOnLine = std::min<size_t>(16, bytes.size() - addr);
+        const size_t bytesOnLine = std::min<size_t>(16, bytes.size() - addr);
         for (size_t i = 0; i < bytesOnLine; ++i) {
             outFile << " "
                     << std::setw(2)
@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
 
     try {
         RV32IAssembler::init();
-        std::vector<uint8_t> bytes = RV32IAssembler::assemble(lines);
+        const std::vector<uint8_t> bytes = RV32IAssembler::assemble(lines);
 
         std::cout << "Assembly completed successfully!\n"
                   << "Generated " << bytes.size()

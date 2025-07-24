@@ -14,7 +14,7 @@ public:
     }
 
     std::vector<std::string> expand(const std::vector<std::string>& operands,
-                                   uint32_t currentAddress,
+                                   const uint32_t currentAddress,
                                    const std::map<std::string, uint32_t>& labels) override {
         if (operands.size() != 1) {
             throw AssemblyException("call requires exactly 1 operand: call label");
@@ -22,14 +22,14 @@ public:
 
         const std::string& label = operands[0];
 
-        auto it = labels.find(label);
+        const auto it = labels.find(label);
         if (it == labels.end()) {
             throw AssemblyException("Label not found: " + label);
         }
 
-        int32_t offset = static_cast<int32_t>(it->second) - static_cast<int32_t>(currentAddress);
+        const int32_t offset = static_cast<int32_t>(it->second) - static_cast<int32_t>(currentAddress);
 
-        int32_t hi20 = (offset + 0x800) >> 12;
+        const int32_t hi20 = (offset + 0x800) >> 12;
         int32_t lo12 = offset & 0xfff;
         if (lo12 & 0x800) lo12 |= 0xfffff000;
 
