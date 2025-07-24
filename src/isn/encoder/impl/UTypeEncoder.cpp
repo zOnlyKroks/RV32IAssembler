@@ -12,7 +12,7 @@ uint32_t UTypeEncoder::encode(const std::string& mnemonic,
     const int rd = parseRegister(operands[0]);
     const int imm = parseImmediate(operands[1], 20, false);
 
-    return (imm << 12) | 
-           (rd << 7) | 
+    return (imm << 12) |
+           (rd << 7) |
            getOpCode(mnemonic);
 }

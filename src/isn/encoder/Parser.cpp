@@ -12,6 +12,7 @@ int Parser::parseRegister(const std::string& reg) {
     return it->second;
 }
 
+
 int Parser::parseImmediate(const std::string& immStr, const int bits, const bool isSigned) {
     if (bits > 32) {
         throw AssemblyException("Bit width too large: " + std::to_string(bits));

@@ -256,7 +256,7 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
 
     for (const auto& line : lines) {
         std::string processed = removeComments(line);
-        // Trim whitespace
+
         processed.erase(processed.begin(),
             std::ranges::find_if(processed,
                                  [](const int ch) { return !std::isspace(ch); }));
@@ -267,7 +267,6 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
 
         if (processed.empty()) continue;
 
-        // Handle labels
         if (size_t colonPos = processed.find(':'); colonPos != std::string::npos) {
             if (std::string label = processed.substr(0, colonPos); !label.empty()) {
                 if (labels.contains(label)) {
@@ -276,14 +275,14 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
                 labels[label] = address;
             }
             processed = processed.substr(colonPos + 1);
-            // Trim again after removing label
+
             processed.erase(processed.begin(),
                 std::ranges::find_if(processed,
                                      [](const int ch) { return !std::isspace(ch); }));
         }
 
         if (!processed.empty()) {
-            std::vector<std::string> expanded = expandInstruction(processed, 0);
+            std::vector<std::string> expanded = expandInstruction(processed, address, labels, 0);
             cleanedLines.insert(cleanedLines.end(), expanded.begin(), expanded.end());
             address += static_cast<uint32_t>(expanded.size() * 4);
         }
@@ -327,7 +326,10 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
     return output;
 }
 
-std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& line, int depth) {
+std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& line,
+                                                           uint32_t address,
+                                                           const std::map<std::string, uint32_t>& labels,
+                                                           int depth) {
     if (depth > 10) {
         throw AssemblyException("Exceeded maximum recursion depth");
     }
@@ -351,12 +353,20 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& li
 
     try {
         PseudoInstruction* pseudo = getPseudoInstruction(mnemonic);
-        std::vector<std::string> expanded = pseudo->getExpander()->expand(operands);
+        std::vector<std::string> expanded;
+
+        if (pseudo->getExpander()->needsLabelContext()) {
+            expanded = pseudo->getExpander()->expand(operands, address, labels);
+        } else {
+            expanded = pseudo->getExpander()->expand(operands);
+        }
 
         std::vector<std::string> fullyExpanded;
+        uint32_t instrAddress = address;
         for (const auto& instr : expanded) {
-            std::vector<std::string> recursed = expandInstruction(instr, depth + 1);
+            std::vector<std::string> recursed = expandInstruction(instr, instrAddress, labels, depth + 1);
             fullyExpanded.insert(fullyExpanded.end(), recursed.begin(), recursed.end());
+            instrAddress += static_cast<uint32_t>(recursed.size() * 4);
         }
         return fullyExpanded;
     } catch (const std::invalid_argument&) {

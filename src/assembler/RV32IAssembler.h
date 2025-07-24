@@ -39,7 +39,11 @@ private:
     static void addPseudoInstruction(const std::string& mnemonic,
                                      PseudoInstructionExpander* expander);
 
-    static std::vector<std::string> expandInstruction(const std::string& line, int depth);
+    static std::vector<std::string> expandInstruction(const std::string& line,
+                                                           uint32_t address,
+                                                           const std::map<std::string, uint32_t>& labels,
+                                                           int depth);
+
     static std::string removeComments(const std::string& line);
 };
 
