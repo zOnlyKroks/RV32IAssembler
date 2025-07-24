@@ -7,4 +7,5 @@ file(GLOB_RECURSE SRC_FILES src/*.cpp src/*.h)
 
 configure_file(${CMAKE_SOURCE_DIR}/assembleMe.s ${CMAKE_BINARY_DIR}/assembleMe.s COPYONLY)
 
-add_executable(RV32IAssembler ${SRC_FILES})
+add_executable(RV32IAssembler ${SRC_FILES}
+        src/isn/expander/impl/LoadAddressExpander.h)
