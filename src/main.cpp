@@ -90,8 +90,8 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        RV32IAssembler assembler;
-        std::vector<uint8_t> bytes = assembler.assemble(lines);
+        RV32IAssembler::init();
+        std::vector<uint8_t> bytes = RV32IAssembler::assemble(lines);
 
         std::cout << "Assembly completed successfully!\n"
                   << "Generated " << bytes.size()

@@ -19,8 +19,6 @@ public:
 
 class RV32IAssembler {
 public:
-    RV32IAssembler();
-
     static std::map<std::string, std::unique_ptr<Instruction>> instructions;
     static std::map<std::string, int> registers;
 
@@ -28,6 +26,7 @@ public:
     static PseudoInstruction* getPseudoInstruction(const std::string& mnemonic);
 
     static std::vector<uint8_t> assemble(const std::vector<std::string>& lines);
+    static void init();
 
 private:
     static void initializeRegisters();
@@ -40,7 +39,7 @@ private:
     static void addPseudoInstruction(const std::string& mnemonic,
                                      PseudoInstructionExpander* expander);
 
-    static std::vector<std::string> expandInstruction(const std::string& line);
+    static std::vector<std::string> expandInstruction(const std::string& line, int depth);
     static std::string removeComments(const std::string& line);
 };
 

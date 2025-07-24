@@ -5,7 +5,7 @@
 #include "../../isn/Instruction.h"
 #include "../expander/PseudoInstructionExpander.h"
 
-class PseudoInstruction : public Instruction {
+class PseudoInstruction final : public Instruction {
 public:
     PseudoInstruction(const std::string& mnemonic, 
                       PseudoInstructionExpander* expander);

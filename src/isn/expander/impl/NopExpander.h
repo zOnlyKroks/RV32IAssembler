@@ -2,7 +2,7 @@
 #include "../PseudoInstructionExpander.h"
 #include "../../../assembler/RV32IAssembler.h"
 
-class NopExpander : public PseudoInstructionExpander {
+class NopExpander final : public PseudoInstructionExpander {
 public:
     std::vector<std::string> expand(const std::vector<std::string>& operands) override {
         if (!operands.empty()) {

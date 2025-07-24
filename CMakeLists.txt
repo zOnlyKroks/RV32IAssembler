@@ -5,7 +5,6 @@ set(CMAKE_CXX_STANDARD 26)
 
 file(GLOB_RECURSE SRC_FILES src/*.cpp src/*.h)
 
-# Copy the input assembly file into the build dir
 configure_file(${CMAKE_SOURCE_DIR}/assembleMe.s ${CMAKE_BINARY_DIR}/assembleMe.s COPYONLY)
 
 add_executable(RV32IAssembler ${SRC_FILES})

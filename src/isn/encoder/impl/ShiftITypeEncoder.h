@@ -4,7 +4,7 @@
 #include "../InstructionEncoder.h"
 #include "../Parser.h"
 
-class ShiftITypeEncoder : public InstructionEncoder, public Parser {
+class ShiftITypeEncoder final : public InstructionEncoder, public Parser {
 public:
     uint32_t encode(const std::string& mnemonic,
                     const std::vector<std::string>& operands,

@@ -19,12 +19,16 @@ int Parser::parseImmediate(const std::string& immStr, const int bits, const bool
 
     try {
         if (immStr.size() > 2 && immStr.substr(0, 2) == "0x") {
+            const std::string hexStr = immStr.substr(2);
             char* end;
-            const unsigned long value = std::strtoul(immStr.substr(2).c_str(), &end, 16);
+            const unsigned long value = std::strtoul(hexStr.c_str(), &end, 16);
             if (*end != '\0') {
                 throw AssemblyException("Invalid hex immediate: " + immStr);
             }
-            return value & ((1ULL << bits) - 1);
+
+            const unsigned long long masked = value & ((1ULL << bits) - 1);
+            return static_cast<int>(masked);
+
         }
 
         char* end;
@@ -57,9 +61,9 @@ int Parser::parseImmediate(const std::string& immStr, const int bits, const bool
                 std::to_string(max) + ")");
         }
 
-        return static_cast<uint32_t>(value) & ((1ULL << bits) - 1);
+        return static_cast<int>(static_cast<uint32_t>(value) & ((1ULL << bits) - 1));
     }
-    catch (const std::exception& e) {
+    catch ([[maybe_unused]] const std::exception& e) {
         throw AssemblyException("Invalid immediate: " + immStr);
     }
 }

@@ -3,7 +3,7 @@
 #include "../PseudoInstructionExpander.h"
 #include "../../../assembler/RV32IAssembler.h"
 
-class JumpRegisterExpander : public PseudoInstructionExpander {
+class JumpRegisterExpander final : public PseudoInstructionExpander {
 public:
     std::vector<std::string> expand(const std::vector<std::string>& operands) override {
         if (operands.size() != 2) {

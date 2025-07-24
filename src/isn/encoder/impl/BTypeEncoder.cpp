@@ -11,7 +11,7 @@ uint32_t BTypeEncoder::encode(const std::string& mnemonic,
 
     const int rs1 = parseRegister(operands[0]);
     const int rs2 = parseRegister(operands[1]);
-    const std::string label = operands[2];
+    const std::string& label = operands[2];
 
     const auto labelIt = labels.find(label);
     if (labelIt == labels.end()) {
@@ -19,7 +19,7 @@ uint32_t BTypeEncoder::encode(const std::string& mnemonic,
     }
     const uint32_t targetAddress = labelIt->second;
 
-    const int32_t offset = static_cast<int32_t>(targetAddress - address);
+    const auto offset = static_cast<int32_t>(targetAddress - address);
 
     if ((offset & 0x1) != 0) {
         throw std::runtime_error("Unaligned branch target: " + label);

@@ -1,6 +1,6 @@
 #pragma once
 
-class LoadWordImmediateExpander : public PseudoInstructionExpander, public Parser {
+class LoadWordImmediateExpander final : public PseudoInstructionExpander, public Parser {
 public:
     std::vector<std::string> expand(const std::vector<std::string>& operands) override {
         if (operands.size() != 2) {
@@ -10,7 +10,7 @@ public:
         const std::string& rd     = operands[0];
         const std::string& immStr = operands[1];
 
-        int32_t imm = parseImmediate(immStr, 32, false);
+        const int32_t imm = parseImmediate(immStr, 32, false);
 
         int32_t lower12 = imm & 0xFFF;
 

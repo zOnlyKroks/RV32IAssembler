@@ -52,7 +52,7 @@
 std::map<std::string, std::unique_ptr<Instruction>> RV32IAssembler::instructions;
 std::map<std::string, int> RV32IAssembler::registers;
 
-RV32IAssembler::RV32IAssembler() {
+void RV32IAssembler::init() {
     static bool initialized = false;
     if (!initialized) {
         initializeRegisters();
@@ -176,15 +176,15 @@ void RV32IAssembler::initializeInstructions() {
     addPseudoInstruction("i2fimm", new I2FImm());
 }
 
-void RV32IAssembler::addInstruction(const std::string& mnemonic, 
-                                   InstructionEncoder* encoder, 
+void RV32IAssembler::addInstruction(const std::string& mnemonic,
+                                   InstructionEncoder* encoder,
                                    int opCode, int funct3, int funct7) {
     instructions[mnemonic] = std::make_unique<RealInstruction>(
         mnemonic, encoder, opCode, funct3, funct7
     );
 }
 
-void RV32IAssembler::addPseudoInstruction(const std::string& mnemonic, 
+void RV32IAssembler::addPseudoInstruction(const std::string& mnemonic,
                                          PseudoInstructionExpander* expander) {
     instructions[mnemonic] = std::make_unique<PseudoInstruction>(
         mnemonic, expander
@@ -210,17 +210,17 @@ PseudoInstruction* RV32IAssembler::getPseudoInstruction(const std::string& mnemo
 std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& lines) {
     std::map<std::string, uint32_t> labels;
     std::vector<std::string> cleanedLines;
-    int address = 0;
+    uint32_t address = 0;
 
     for (const auto& line : lines) {
         std::string processed = removeComments(line);
         // Trim whitespace
         processed.erase(processed.begin(),
-            std::find_if(processed.begin(), processed.end(),
-                [](int ch) { return !std::isspace(ch); }));
+            std::ranges::find_if(processed,
+                                 [](const int ch) { return !std::isspace(ch); }));
         processed.erase(
             std::find_if(processed.rbegin(), processed.rend(),
-                [](int ch) { return !std::isspace(ch); }).base(),
+                [](const int ch) { return !std::isspace(ch); }).base(),
             processed.end());
 
         if (processed.empty()) continue;
@@ -241,15 +241,16 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
         }
 
         if (!processed.empty()) {
-            std::vector<std::string> expanded = expandInstruction(processed);
+            std::vector<std::string> expanded = expandInstruction(processed, 0);
             cleanedLines.insert(cleanedLines.end(), expanded.begin(), expanded.end());
-            address += expanded.size() * 4;
+            address += static_cast<uint32_t>(expanded.size() * 4);
         }
     }
 
-    // Second pass: actual assembly
     address = 0;
     std::vector<uint8_t> output;
+    output.reserve(cleanedLines.size() * 4);
+
     for (const auto& line : cleanedLines) {
         std::istringstream iss(line);
         std::string mnemonic;
@@ -284,19 +285,23 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& li
     return output;
 }
 
-std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& line) {
+std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& line, int depth) {
+    if (depth > 10) {
+        throw AssemblyException("Exceeded maximum recursion depth");
+    }
+
     std::istringstream iss(line);
     std::string mnemonic;
     iss >> mnemonic;
-    
+
     std::vector<std::string> operands;
     std::string token;
     while (std::getline(iss >> std::ws, token, ',')) {
-        token.erase(token.begin(), 
+        token.erase(token.begin(),
             std::ranges::find_if(token,
                                  [](const int ch) { return !std::isspace(ch); }));
         token.erase(
-            std::find_if(token.rbegin(), token.rend(), 
+            std::find_if(token.rbegin(), token.rend(),
                 [](const int ch) { return !std::isspace(ch); }).base(),
             token.end());
         operands.push_back(token);
@@ -308,7 +313,7 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string& li
 
         std::vector<std::string> fullyExpanded;
         for (const auto& instr : expanded) {
-            std::vector<std::string> recursed = expandInstruction(instr);
+            std::vector<std::string> recursed = expandInstruction(instr, depth + 1);
             fullyExpanded.insert(fullyExpanded.end(), recursed.begin(), recursed.end());
         }
         return fullyExpanded;
