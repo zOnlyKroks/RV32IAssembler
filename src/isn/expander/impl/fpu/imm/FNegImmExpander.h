@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../PseudoInstructionExpander.h"
-#include "../../../../assembler/RV32IAssembler.h"
+#include "../../../PseudoInstructionExpander.h"
+#include "../../../../../assembler/RV32IAssembler.h"
 
 class FNegImmExpander final : public PseudoInstructionExpander {
 public:

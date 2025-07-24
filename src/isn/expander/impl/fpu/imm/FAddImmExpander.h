@@ -1,20 +1,20 @@
 #pragma once
 
-#include "../../PseudoInstructionExpander.h"
-#include "../../../../assembler/RV32IAssembler.h"
+#include "../../../PseudoInstructionExpander.h"
+#include "../../../../../assembler/RV32IAssembler.h"
 
-class FmulImmExpander final : public PseudoInstructionExpander {
+class FAddImmExpander final : public PseudoInstructionExpander {
 public:
     std::vector<std::string> expand(const std::vector<std::string>& operands) override {
         if (operands.size() != 3) {
-            throw AssemblyException("fmulimm requires exactly 3 operands: fmulimm rd, imm1, imm2");
+            throw AssemblyException("faddimm requires exactly 3 operands: faddimm rd, imm1, imm2");
         }
 
         const std::string& rd = operands[0];
         const std::string& imm1 = operands[1];
         const std::string& imm2 = operands[2];
 
-        const std::string helperImm3 = "2";
+        const std::string helperImm3 = "0";
         const std::string helperImm4 = "0x01000000";
 
         return {

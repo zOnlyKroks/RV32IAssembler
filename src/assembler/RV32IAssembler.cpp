@@ -38,16 +38,35 @@
 #include "../isn/expander/impl/SnezExpander.h"
 #include "../isn/expander/impl/LoadWordImmediateExpander.h"
 
-#include "../isn/expander/impl/fpu/FAddImmExpander.h"
-#include "../isn/expander/impl/fpu/FSubImmExpander.h"
-#include "../isn/expander/impl/fpu/FMultImmExpander.h"
-#include "../isn/expander/impl/fpu/FDivImmExpander.h"
-#include "../isn/expander/impl/fpu/FNegImmExpander.h"
-#include "../isn/expander/impl/fpu/FCompAGreatB.h"
-#include "../isn/expander/impl/fpu/FCompALessB.h"
-#include "../isn/expander/impl/fpu/FCompAEqualB.h"
-#include "../isn/expander/impl/fpu/F2IImmExpander.h"
-#include "../isn/expander/impl/fpu/I2FImmExpander.h"
+#include "../isn/expander/impl/fpu/imm/FAddImmExpander.h"
+#include "../isn/expander/impl/fpu/norm/FAddExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/FSubImmExpander.h"
+#include "../isn/expander/impl/fpu/norm/FSubExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/FMultImmExpander.h"
+#include "../isn/expander/impl/fpu/norm/FMultExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/FDivImmExpander.h"
+#include "../isn/expander/impl/fpu/norm/FDivExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/FNegImmExpander.h"
+#include "../isn/expander/impl/fpu/norm/FNegExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/FCompAGreatB.h"
+#include "../isn/expander/impl/fpu/norm/FCompGreaterExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/FCompALessB.h"
+#include "../isn/expander/impl/fpu/norm/FCompLessExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/FCompAEqualB.h"
+#include "../isn/expander/impl/fpu/norm/FCompEqualExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/F2IImmExpander.h"
+#include "../isn/expander/impl/fpu/norm/F2IExpander.h"
+
+#include "../isn/expander/impl/fpu/imm/I2FImmExpander.h"
+#include "../isn/expander/impl/fpu/norm/I2FExpander.h"
 
 std::map<std::string, std::unique_ptr<Instruction>> RV32IAssembler::instructions;
 std::map<std::string, int> RV32IAssembler::registers;
@@ -164,16 +183,34 @@ void RV32IAssembler::initializeInstructions() {
     addPseudoInstruction("lwi", new LoadWordImmediateExpander());
 
     addPseudoInstruction("faddimm", new FAddImmExpander());
+    addPseudoInstruction("fadd", new FAddExpander());
+
     addPseudoInstruction("fsubimm", new FSubImmExpander());
+    addPseudoInstruction("fsub", new FSubExpander());
+
     addPseudoInstruction("fmulimm", new FmulImmExpander());
+    addPseudoInstruction("fmul", new FMultExpander());
+
     addPseudoInstruction("fdivimm", new FDivImmExpander());
+    addPseudoInstruction("fdiv", new FDivExpander());
+
     addPseudoInstruction("fnegimm", new FNegImmExpander());
-    addPseudoInstruction("fcmpgt", new FCompAGreatBImmExpander());
-    addPseudoInstruction("fcmplt", new FCompALessBImmExpander());
-    addPseudoInstruction("fcmpeq", new FCompAEqualBImmExpander());
+    addPseudoInstruction("fneg", new FNegExpander());
+
+    addPseudoInstruction("fcmpgtim", new FCompAGreatBImmExpander());
+    addPseudoInstruction("fcmpgt", new FCompGreaterExpander());
+
+    addPseudoInstruction("fcmpltim", new FCompALessBImmExpander());
+    addPseudoInstruction("fcmplt", new FCompLessExpander());
+
+    addPseudoInstruction("fcmpeqim", new FCompAEqualBImmExpander());
+    addPseudoInstruction("fcmpeq", new FCompEqualExpander());
 
     addPseudoInstruction("f2iimm", new F2IImm());
+    addPseudoInstruction("f2i", new F2IExpander());
+
     addPseudoInstruction("i2fimm", new I2FImm());
+    addPseudoInstruction("i2f", new I2FExpander());
 }
 
 void RV32IAssembler::addInstruction(const std::string& mnemonic,
