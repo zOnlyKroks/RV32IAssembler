@@ -371,7 +371,7 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string &li
     }
 
     try {
-        PseudoInstruction *pseudo = getPseudoInstruction(mnemonic);
+        const PseudoInstruction *pseudo = getPseudoInstruction(mnemonic);
         std::vector<std::string> expanded;
 
         if (pseudo->getExpander()->needsLabelContext()) {
