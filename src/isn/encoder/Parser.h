@@ -1,10 +1,12 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include <cstdint>
 #include <string>
 #include <map>
 #include <stdexcept>
 #include <utility>
+
 class Parser {
 public:
     virtual ~Parser() = default;

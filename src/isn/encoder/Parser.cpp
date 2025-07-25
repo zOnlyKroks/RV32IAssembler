@@ -3,6 +3,7 @@
 #include <regex>
 #include <stack>
 #include <cmath>
+#include <cstring>
 
 #include "../../assembler/RV32IAssembler.h"
 
@@ -92,7 +93,7 @@ long long evaluateExpression(const std::string& expr,
                 values.push(it->second);
             }
             expectOperand = false;
-        } else if (strchr("+-*/&|^<>", expr[i])) {
+        } else if (std::strchr("+-*/&|^<>", expr[i])) {
             char op = expr[i];
 
             // Handle unary minus

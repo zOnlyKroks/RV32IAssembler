@@ -1,6 +1,8 @@
 #include "RV32IAssembler.h"
 #include <sstream>
 #include <algorithm>
+#include <iostream>
+
 #include "../isn/expander/PseudoInstructionExpander.h"
 
 #include "../isn/encoder/impl/BTypeEncoder.h"
@@ -357,7 +359,7 @@ RV32IAssembler::Binary RV32IAssembler::assembleBinary(const std::vector<std::str
             std::vector<std::string> expanded = expandInstruction(processed, textAddress, labels, 0);
             textAddress += expanded.size() * 4;
         } catch (const std::exception&) {
-            textAddress += 4;
+            throw AssemblyException("Failed to expand instruction: " + processed);
         }
     }
 
@@ -401,7 +403,6 @@ RV32IAssembler::Binary RV32IAssembler::assembleBinary(const std::vector<std::str
         }
     }
 
-    // Process data section
     std::vector<uint8_t> dataBinary;
     for (const auto& line : dataLines) {
         if (line.find(".word") == 0) {
@@ -423,6 +424,13 @@ RV32IAssembler::Binary RV32IAssembler::assembleBinary(const std::vector<std::str
     return {textBinary, dataBinary, dataBaseAddress};
 }
 
+static bool is_number(const std::string &s) {
+    if (s.empty()) return false;
+    char *endptr = nullptr;
+    std::strtol(s.c_str(), &endptr, 0);
+    return endptr == s.c_str() + s.size();
+}
+
 std::vector<std::string> RV32IAssembler::expandInstruction(const std::string &line,
                                                            const uint32_t address,
                                                            const std::map<std::string, uint32_t> &labels,
@@ -435,33 +443,95 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string &li
     std::string mnemonic;
     iss >> mnemonic;
 
+    if (!mnemonic.empty() && mnemonic[0] == '.') {
+        return { line };
+    }
+
     std::vector<std::string> operands;
     std::string token;
     while (std::getline(iss >> std::ws, token, ',')) {
-        token.erase(token.begin(),
-                    std::ranges::find_if(token,
-                                         [](const int ch) { return !std::isspace(ch); }));
-        token.erase(
-            std::find_if(token.rbegin(), token.rend(),
-                         [](const int ch) { return !std::isspace(ch); }).base(),
-            token.end());
+        token.erase(token.begin(), std::ranges::find_if(token, [](unsigned char c){ return !std::isspace(c); }));
+        token.erase(std::find_if(token.rbegin(), token.rend(), [](unsigned char c){ return !std::isspace(c); }).base(), token.end());
         operands.push_back(token);
     }
 
+    if ((mnemonic == "lw" || mnemonic == "lh" || mnemonic == "lb" ||
+     mnemonic == "lbu" || mnemonic == "lhu") && operands.size() == 2) {
+    const std::string& rd = operands[0];
+    const std::string& addrOp = operands[1];
+
+    size_t openParen = addrOp.find('(');
+
+    if (size_t closeParen = addrOp.find(')', openParen); openParen != std::string::npos && closeParen != std::string::npos) {
+        std::string offsetStr = addrOp.substr(0, openParen);
+        std::string baseReg = addrOp.substr(openParen + 1, closeParen - openParen - 1);
+
+        trimInPlace(offsetStr);
+        trimInPlace(baseReg);
+
+        bool isValidBaseReg = false;
+        if (registers.contains(baseReg)) {
+            isValidBaseReg = true;
+        } else if (is_number(baseReg)) {
+            if (int regNum = std::stoi(baseReg); regNum >= 0 && regNum <= 31) {
+                isValidBaseReg = true;
+            }
+        }
+
+        if (!isValidBaseReg) {
+            std::cout << "Warning: Base register '" << baseReg << "' in '" << line
+                      << "' is not a valid register. Treating as label address." << std::endl;
+
+            std::string tempReg = rd;
+            std::string laLine = "la " + tempReg + ", " + baseReg;
+            std::string newLoadLine = mnemonic + " " + rd + ", " + offsetStr + "(" + tempReg + ")";
+
+            std::vector<std::string> result;
+
+            std::vector<std::string> expandedLa = expandInstruction(laLine, address, labels, depth+1);
+            result.insert(result.end(), expandedLa.begin(), expandedLa.end());
+
+            uint32_t nextAddr = address + static_cast<uint32_t>(expandedLa.size() * 4);
+            std::vector<std::string> expandedLoad = expandInstruction(newLoadLine, nextAddr, labels, depth+1);
+            result.insert(result.end(), expandedLoad.begin(), expandedLoad.end());
+
+            return result;
+        }
+    } else if (!is_number(addrOp) && !registers.contains(addrOp)) {
+        std::cout << "Warning: Address operand '" << addrOp << "' in '" << line
+                  << "' is a label. Loading address and then loading from offset 0." << std::endl;
+
+        std::string tempReg = rd;
+        std::string laLine = "la " + tempReg + ", " + addrOp;
+        std::string newLoadLine = mnemonic + " " + rd + ", 0(" + tempReg + ")";
+
+        std::vector<std::string> result;
+
+        std::vector<std::string> expandedLa = expandInstruction(laLine, address, labels, depth+1);
+        result.insert(result.end(), expandedLa.begin(), expandedLa.end());
+
+        uint32_t nextAddr = address + static_cast<uint32_t>(expandedLa.size() * 4);
+        std::vector<std::string> expandedLoad = expandInstruction(newLoadLine, nextAddr, labels, depth+1);
+        result.insert(result.end(), expandedLoad.begin(), expandedLoad.end());
+
+        return result;
+    }
+}
+
     try {
         const PseudoInstruction *pseudo = getPseudoInstruction(mnemonic);
-        std::vector<std::string> expanded = pseudo->getExpander()->expand(operands, address, labels);;
+        std::vector<std::string> expanded = pseudo->getExpander()->expand(operands, address, labels);
 
-        std::vector<std::string> fullyExpanded;
-        uint32_t instrAddress = address;
-        for (const auto &instr: expanded) {
-            std::vector<std::string> recursed = expandInstruction(instr, instrAddress, labels, depth + 1);
-            fullyExpanded.insert(fullyExpanded.end(), recursed.begin(), recursed.end());
-            instrAddress += static_cast<uint32_t>(recursed.size() * 4);
+        std::vector<std::string> result;
+        uint32_t currentAddr = address;
+        for (const auto &instr : expanded) {
+            auto recursed = expandInstruction(instr, currentAddr, labels, depth + 1);
+            result.insert(result.end(), recursed.begin(), recursed.end());
+            currentAddr += static_cast<uint32_t>(recursed.size() * 4);
         }
-        return fullyExpanded;
+        return result;
     } catch (const std::invalid_argument &) {
-        return {line};
+        return { line };
     }
 }
 
