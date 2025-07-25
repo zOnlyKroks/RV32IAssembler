@@ -11,7 +11,7 @@ uint32_t ITypeEncoder::encode(const std::string& mnemonic,
 
     const int rd = parseRegister(operands[0]);
     const int rs1 = parseRegister(operands[1]);
-    const int imm = parseImmediate(operands[2], 12, true);
+    const int imm = parseImmediate(operands[2], 12, true, labels);
     const int funct3 = getFunct3(mnemonic);
 
     return (imm << 20) | 

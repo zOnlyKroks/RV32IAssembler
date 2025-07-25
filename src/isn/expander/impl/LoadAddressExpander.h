@@ -5,10 +5,6 @@
 
 class LoadAddressExpander final : public PseudoInstructionExpander {
 public:
-    std::vector<std::string> expand(const std::vector<std::string>& operands) override {
-        throw AssemblyException("LoadAddressExpander requires label context");
-    }
-    
     std::vector<std::string> expand(const std::vector<std::string>& operands,
                                                     uint32_t address,
                                                     const std::map<std::string, uint32_t>& labels) override {
@@ -26,8 +22,11 @@ public:
 
         const uint32_t labelAddress = labelIt->second;
 
-        const uint32_t upper = (labelAddress + 0x800) >> 12;
-        const int32_t lower = static_cast<int32_t>(labelAddress) - (static_cast<int32_t>(upper) << 12);
+        // Extract lower 12 bits as signed immediate
+        const int32_t lower = static_cast<int32_t>(labelAddress << 20) >> 20;
+
+        // Calculate upper 20 bits, adjusting for sign extension of lower bits
+        const uint32_t upper = (labelAddress - static_cast<uint32_t>(lower)) >> 12;
 
         std::vector<std::string> result;
 
@@ -37,11 +36,10 @@ public:
                 result.push_back("addi " + reg + ", " + reg + ", " + std::to_string(lower));
             }
         } else {
+            // If upper is 0, we can load the entire address with just addi
             result.push_back("addi " + reg + ", zero, " + std::to_string(lower));
         }
 
         return result;
     }
-    
-    [[nodiscard]] bool needsLabelContext() const override { return true; }
 };

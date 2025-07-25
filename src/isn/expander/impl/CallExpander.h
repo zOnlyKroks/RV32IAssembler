@@ -9,10 +9,6 @@
 
 class CallExpander final : public PseudoInstructionExpander {
 public:
-    std::vector<std::string> expand(const std::vector<std::string>& operands) override {
-        throw AssemblyException("call instruction requires label context - use expand with labels");
-    }
-
     std::vector<std::string> expand(const std::vector<std::string>& operands,
                                    const uint32_t currentAddress,
                                    const std::map<std::string, uint32_t>& labels) override {
@@ -41,8 +37,6 @@ public:
 
         return {auipcInstr.str(), jalrInstr.str()};
     }
-
-    [[nodiscard]] bool needsLabelContext() const override { return true; }
 };
 
 #endif // CALL_EXPANDER_H

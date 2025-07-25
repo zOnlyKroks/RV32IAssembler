@@ -251,65 +251,130 @@ PseudoInstruction *RV32IAssembler::getPseudoInstruction(const std::string &mnemo
     return dynamic_cast<PseudoInstruction *>(it->second.get());
 }
 
-std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string> &lines) {
-    std::map<std::string, uint32_t> labels;
-    std::vector<std::string> cleanedLines;
-    uint32_t address = 0;
+std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string>& lines) {
+    auto [text, data, dataBase] = assembleBinary(lines);
 
-    for (const auto &line: lines) {
+    const uint32_t totalSize = dataBase + static_cast<uint32_t>(data.size());
+    std::vector<uint8_t> output(totalSize, 0);
+
+    std::ranges::copy(text,
+                      output.begin());
+
+    std::ranges::copy(data,
+                      output.begin() + dataBase);
+
+    return output;
+}
+
+RV32IAssembler::Binary RV32IAssembler::assembleBinary(const std::vector<std::string>& lines) {
+    std::map<std::string, uint32_t> labels;
+    std::vector<std::string> textLines;
+    std::vector<std::string> dataLines;
+    uint32_t textAddress = 0;
+    uint32_t dataBaseAddress = 0x000000c0;
+    uint32_t currentDataAddress = dataBaseAddress;
+    bool inDataSection = false;
+
+    for (const auto& line : lines) {
         std::string processed = removeComments(line);
         trimInPlace(processed);
 
         if (processed.empty()) continue;
 
+        if (processed == ".data") {
+            inDataSection = true;
+            continue;
+        }
+
+        if (processed == ".text") {
+            inDataSection = false;
+            continue;
+        }
+
         if (size_t colonPos = processed.find(':'); colonPos != std::string::npos) {
             std::string label = processed.substr(0, colonPos);
             trimInPlace(label);
-            if (label.empty()) {
-                throw AssemblyException("Empty label");
+
+            if (!label.empty()) {
+                if (labels.contains(label)) {
+                    throw AssemblyException("Duplicate label: " + label);
+                }
+
+                if (inDataSection) {
+                    labels[label] = currentDataAddress;
+                } else {
+                    labels[label] = textAddress;
+                }
             }
-            if (labels.contains(label)) {
-                throw AssemblyException("Duplicate label: " + label);
-            }
-            labels[label] = address;
 
             processed = processed.substr(colonPos + 1);
             trimInPlace(processed);
             if (processed.empty()) continue;
-        } else {
-            if (size_t eqPos = processed.find('='); eqPos != std::string::npos) {
-                std::string varName = processed.substr(0, eqPos);
-                trimInPlace(varName);
-                if (varName.empty()) {
-                    throw AssemblyException("Missing variable name before '='");
-                }
-                if (labels.contains(varName)) {
-                    throw AssemblyException("Duplicate label or variable: " + varName);
-                }
-
-                std::string expr = processed.substr(eqPos + 1);
-                trimInPlace(expr);
-                try {
-                    uint32_t value = parseConstant(expr);
-                    labels[varName] = value;
-                } catch (const std::exception& e) {
-                    throw AssemblyException("Invalid constant: " + expr + " (" + e.what() + ")");
-                }
-                continue;
-            }
         }
 
-        std::vector<std::string> expanded = expandInstruction(processed, address, labels, 0);
-        cleanedLines.insert(cleanedLines.end(), expanded.begin(), expanded.end());
-        address += static_cast<uint32_t>(expanded.size() * 4);
+        if (size_t eqPos = processed.find('='); eqPos != std::string::npos) {
+            std::string varName = processed.substr(0, eqPos);
+            trimInPlace(varName);
+
+            if (varName.empty()) {
+                throw AssemblyException("Missing variable name before '='");
+            }
+
+            if (labels.contains(varName)) {
+                throw AssemblyException("Duplicate variable: " + varName);
+            }
+
+            std::string expr = processed.substr(eqPos + 1);
+            trimInPlace(expr);
+            try {
+                uint32_t value = Parser::parseConstant(expr, labels);
+                labels[varName] = value;
+            } catch (const std::exception& e) {
+                throw AssemblyException("Invalid constant: " + expr + " (" + e.what() + ")");
+            }
+            continue;
+        }
+
+        if (inDataSection) {
+            dataLines.push_back(processed);
+
+            if (processed.find(".word") == 0) {
+                std::istringstream iss(processed.substr(5));
+                std::string token;
+                while (std::getline(iss >> std::ws, token, ',')) {
+                    trimInPlace(token);
+                    if (!token.empty()) {
+                        currentDataAddress += 4;
+                    }
+                }
+            }
+            continue;
+        }
+
+        textLines.push_back(processed);
+
+        try {
+            std::vector<std::string> expanded = expandInstruction(processed, textAddress, labels, 0);
+            textAddress += expanded.size() * 4;
+        } catch (const std::exception&) {
+            textAddress += 4;
+        }
     }
 
-    address = 0;
-    std::vector<uint8_t> output;
-    output.reserve(cleanedLines.size() * 4);
+    textAddress = 0;
+    std::vector<std::pair<std::string, uint32_t>> textInstructions;
 
-    for (const auto &line: cleanedLines) {
-        std::istringstream iss(line);
+    for (const auto& line : textLines) {
+        for (std::vector<std::string> expanded = expandInstruction(line, textAddress, labels, 0); const auto& instr : expanded) {
+            textInstructions.emplace_back(instr, textAddress);
+            textAddress += 4;
+        }
+    }
+
+    std::vector<uint8_t> textBinary;
+
+    for (const auto& [instruction, address] : textInstructions) {
+        std::istringstream iss(instruction);
         std::string mnemonic;
         iss >> mnemonic;
 
@@ -317,32 +382,45 @@ std::vector<uint8_t> RV32IAssembler::assemble(const std::vector<std::string> &li
         std::string token;
         while (std::getline(iss >> std::ws, token, ',')) {
             trimInPlace(token);
-
-            if (labels.contains(token)) {
-                if (uint32_t value = labels.at(token); value > 0x7FFFFFFF) {
-                    std::ostringstream oss;
-                    oss << "0x" << std::hex << value;
-                    token = oss.str();
-                } else {
-                    token = std::to_string(static_cast<int32_t>(value));
-                }
+            if (!token.empty()) {
+                operands.push_back(token);
             }
-            operands.push_back(token);
         }
 
-        RealInstruction *inst = getRealInstruction(mnemonic);
-        uint32_t encoded = inst->getEncoder()->encode(
-            mnemonic, operands, address, labels
-        );
+        try {
+            RealInstruction* inst = getRealInstruction(mnemonic);
+            uint32_t encoded = inst->getEncoder()->encode(mnemonic, operands, address, labels);
 
-        output.push_back(encoded & 0xFF);
-        output.push_back((encoded >> 8) & 0xFF);
-        output.push_back((encoded >> 16) & 0xFF);
-        output.push_back((encoded >> 24) & 0xFF);
-        address += 4;
+            textBinary.push_back(encoded & 0xFF);
+            textBinary.push_back((encoded >> 8) & 0xFF);
+            textBinary.push_back((encoded >> 16) & 0xFF);
+            textBinary.push_back((encoded >> 24) & 0xFF);
+        } catch (const std::exception& e) {
+            throw AssemblyException("Failed to encode instruction '" + instruction + "' at address " +
+                                  std::to_string(address) + ": " + e.what());
+        }
     }
 
-    return output;
+    // Process data section
+    std::vector<uint8_t> dataBinary;
+    for (const auto& line : dataLines) {
+        if (line.find(".word") == 0) {
+            std::istringstream iss(line.substr(5));
+            std::string token;
+            while (std::getline(iss >> std::ws, token, ',')) {
+                trimInPlace(token);
+                if (token.empty()) continue;
+
+                uint32_t value = Parser::parseConstant(token, labels);
+                dataBinary.push_back(value & 0xFF);
+                dataBinary.push_back((value >> 8) & 0xFF);
+                dataBinary.push_back((value >> 16) & 0xFF);
+                dataBinary.push_back((value >> 24) & 0xFF);
+            }
+        }
+    }
+
+    return {textBinary, dataBinary, dataBaseAddress};
 }
 
 std::vector<std::string> RV32IAssembler::expandInstruction(const std::string &line,
@@ -372,13 +450,7 @@ std::vector<std::string> RV32IAssembler::expandInstruction(const std::string &li
 
     try {
         const PseudoInstruction *pseudo = getPseudoInstruction(mnemonic);
-        std::vector<std::string> expanded;
-
-        if (pseudo->getExpander()->needsLabelContext()) {
-            expanded = pseudo->getExpander()->expand(operands, address, labels);
-        } else {
-            expanded = pseudo->getExpander()->expand(operands);
-        }
+        std::vector<std::string> expanded = pseudo->getExpander()->expand(operands, address, labels);;
 
         std::vector<std::string> fullyExpanded;
         uint32_t instrAddress = address;

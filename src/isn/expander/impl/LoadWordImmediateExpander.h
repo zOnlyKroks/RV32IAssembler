@@ -2,7 +2,9 @@
 
 class LoadWordImmediateExpander final : public PseudoInstructionExpander, public Parser {
 public:
-    std::vector<std::string> expand(const std::vector<std::string>& operands) override {
+    std::vector<std::string> expand(const std::vector<std::string>& operands,
+                                           uint32_t currentAddress,
+                                           const std::map<std::string, uint32_t>& labels) override {
         if (operands.size() != 2) {
             throw AssemblyException("lwi requires exactly 2 operands: lwi rd, imm");
         }
@@ -10,7 +12,7 @@ public:
         const std::string& rd     = operands[0];
         const std::string& immStr = operands[1];
 
-        const int32_t imm = parseImmediate(immStr, 32, false);
+        const int32_t imm = parseImmediate(immStr, 32, false, labels);
 
         int32_t lower12 = imm & 0xFFF;
 
@@ -18,7 +20,7 @@ public:
         hexStream << "0x" << std::hex << (lower12 & 0xFFF);
         const std::string lower12Hex = hexStream.str();
 
-        lower12 = parseImmediate(lower12Hex, 12, false);
+        lower12 = parseImmediate(lower12Hex, 12, false, labels);
 
         const uint32_t upper20 = static_cast<uint32_t>(imm) >> 12;
 

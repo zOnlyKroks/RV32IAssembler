@@ -5,7 +5,9 @@
 
 class FCompAGreatBImmExpander final : public PseudoInstructionExpander {
 public:
-    std::vector<std::string> expand(const std::vector<std::string>& operands) override {
+    std::vector<std::string> expand(const std::vector<std::string>& operands,
+                                                    uint32_t address,
+                                                    const std::map<std::string, uint32_t>& labels) override {
         if (operands.size() != 3) {
             throw AssemblyException("fcmpgt requires exactly 3 operands: fcmpgt rd, imm1, imm2");
         }

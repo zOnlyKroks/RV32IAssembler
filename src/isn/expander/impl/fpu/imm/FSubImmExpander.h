@@ -5,7 +5,9 @@
 
 class FSubImmExpander final : public PseudoInstructionExpander {
 public:
-    std::vector<std::string> expand(const std::vector<std::string>& operands) override {
+    std::vector<std::string> expand(const std::vector<std::string>& operands,
+                                                    uint32_t address,
+                                                    const std::map<std::string, uint32_t>& labels) override {
         if (operands.size() != 3) {
             throw AssemblyException("fsubimm requires exactly 3 operands: fsubimm rd, imm1, imm2");
         }

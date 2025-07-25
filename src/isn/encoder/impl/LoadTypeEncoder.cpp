@@ -11,7 +11,7 @@ uint32_t LoadTypeEncoder::encode(const std::string& mnemonic,
     }
 
     const int rd = parseRegister(operands[0]);
-    auto [offset, rs1] = parseMemoryOperand(operands[1]);
+    auto [offset, rs1] = parseMemoryOperand(operands[1], labels);
     const int funct3 = getFunct3(mnemonic);
 
     return (offset << 20) | 

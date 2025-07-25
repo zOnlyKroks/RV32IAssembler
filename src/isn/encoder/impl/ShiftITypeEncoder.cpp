@@ -11,7 +11,7 @@ uint32_t ShiftITypeEncoder::encode(const std::string& mnemonic,
 
     const int rd = parseRegister(operands[0]);
     const int rs1 = parseRegister(operands[1]);
-    const int shamt = parseImmediate(operands[2], 5, false);
+    const int shamt = parseImmediate(operands[2], 5, false, labels);
     const int funct3 = getFunct3(mnemonic);
     const int funct7 = getFunct7(mnemonic);
 
